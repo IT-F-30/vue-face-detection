@@ -350,9 +350,4 @@ p {
     cursor: default;
     box-shadow: none;
 }
-
-/* Add ripple effect styles if needed */
-.mdc-button__ripple {
-  /* Basic ripple setup */
-}
 </style>
