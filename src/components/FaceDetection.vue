@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, onMounted, onBeforeUnmount, nextTick, h } from "vue"; // h をインポート
 import {
   FaceDetector,
   FilesetResolver,
   type Detection, // Changed: Added 'type' keyword
-  type FaceDetectorResult // Changed: Added 'type' keyword
-} from '@mediapipe/tasks-vision';
-const colorMap: Record<number, string> = { 1: "#000000", 2: "#FFFFFF", 3: "#FF0000", 4: "#00FF00", 5: "#0000FF",6:"rgba(0,0,0,0)" };
+  type FaceDetectorResult, // Changed: Added 'type' keyword
+} from "@mediapipe/tasks-vision";
+const colorMap: Record<number, string> = {
+  1: "#000000",
+  2: "#FFFFFF",
+  3: "#FF0000",
+  4: "#00FF00",
+  5: "#0000FF",
+};
 
 // --- Refs for DOM elements ---
 const videoRef = ref<HTMLVideoElement | null>(null);
@@ -17,7 +23,7 @@ const imageRef = ref<HTMLImageElement | null>(null); // Ref for the image elemen
 
 // --- MediaPipe State ---
 let faceDetector: FaceDetector | undefined = undefined;
-let runningMode = ref<'IMAGE' | 'VIDEO'>('IMAGE');
+let runningMode = ref<"IMAGE" | "VIDEO">("IMAGE");
 let webcamRunning = ref(false);
 let lastVideoTime = -1;
 const children = ref<HTMLElement[]>([]); // Store dynamically added elements
@@ -32,7 +38,9 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   // Cleanup resources if needed (e.g., stop webcam stream)
   if (videoRef.value?.srcObject) {
-    (videoRef.value.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+    (videoRef.value.srcObject as MediaStream)
+      .getTracks()
+      .forEach((track) => track.stop());
   }
   faceDetector?.close();
 });
@@ -46,79 +54,31 @@ const initializeFaceDetector = async () => {
     faceDetector = await FaceDetector.createFromOptions(vision, {
       baseOptions: {
         modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite`,
-        delegate: 'GPU',
+        delegate: "GPU",
       },
       runningMode: runningMode.value,
     });
-    console.log('FaceDetector initialized');
+    console.log("FaceDetector initialized");
     // Make the demos section visible now that the detector is ready
-    const demosSection = document.getElementById('demos');
+    const demosSection = document.getElementById("demos");
     if (demosSection) {
-        demosSection.classList.remove('invisible');
+      demosSection.classList.remove("invisible");
     }
   } catch (error) {
-    console.error('Failed to initialize FaceDetector:', error);
-    alert('Failed to initialize FaceDetector. Check console for details.');
+    console.error("Failed to initialize FaceDetector:", error);
+    alert("Failed to initialize FaceDetector. Check console for details.");
   }
 };
 
-// --- Image Detection Logic ---
-const handleClick = async (event: MouseEvent) => {
-  if (!faceDetector) {
-    console.log('Wait for FaceDetector to load before clicking');
-    return;
-  }
-  if (!imageRef.value || !imageContainerRef.value) return;
-
-  // Clear previous detections
-  clearDetections(imageContainerRef.value);
-
-  // Ensure running mode is IMAGE
-  if (runningMode.value === 'VIDEO') {
-    await faceDetector.setOptions({ runningMode: 'IMAGE' });
-    runningMode.value = 'IMAGE';
-  }
-
-  const targetImage = event.target as HTMLImageElement;
-
-  // Detect faces
-  const detections = faceDetector.detect(targetImage).detections;
-  console.log('Image detections:', detections);
-
-  // Display detections
-  displayImageDetections(detections, targetImage);
-};
-
-const displayImageDetections = (detections: Detection[], resultElement: HTMLImageElement) => {
-  if (!imageContainerRef.value) return;
-  const container = imageContainerRef.value;
-  const ratio = resultElement.height / resultElement.naturalHeight;
-
-  console.log(`Detected ${detections.length} faces in the image.`); // Log number of faces
-
-  detections.forEach((detection, index) => {
-    if (!detection.boundingBox) return;
-
-    // Log bounding box coordinates for each face
-    console.log(`Image Face ${index + 1} Bounding Box:`, {
-        originX: detection.boundingBox.originX,
-        originY: detection.boundingBox.originY,
-        width: detection.boundingBox.width,
-        height: detection.boundingBox.height,
-    });
-  });
-};
-
-// --- Webcam Detection Logic ---
 const enableCam = async () => {
   if (!faceDetector) {
-    alert('Face Detector is still loading. Please try again.');
+    alert("Face Detector is still loading. Please try again.");
     return;
   }
   if (!videoRef.value || !webcamButtonRef.value) return;
 
   webcamRunning.value = true;
-  webcamButtonRef.value.classList.add('removed'); // Hide button visually
+  webcamButtonRef.value.classList.add("removed"); // Hide button visually
 
   const constraints = { video: true };
 
@@ -127,10 +87,10 @@ const enableCam = async () => {
     videoRef.value.srcObject = stream;
     // The 'loadeddata' event listener is added in the template
   } catch (err) {
-    console.error('getUserMedia error:', err);
+    console.error("getUserMedia error:", err);
     webcamRunning.value = false;
-    webcamButtonRef.value.classList.remove('removed');
-    alert('Could not access webcam.');
+    webcamButtonRef.value.classList.remove("removed");
+    alert("Could not access webcam.");
   }
 };
 
@@ -138,30 +98,33 @@ const predictWebcam = async () => {
   if (!faceDetector || !videoRef.value || !liveViewRef.value) return;
 
   // Ensure running mode is VIDEO
-  if (runningMode.value === 'IMAGE') {
-    await faceDetector.setOptions({ runningMode: 'VIDEO' });
-    runningMode.value = 'VIDEO';
+  if (runningMode.value === "IMAGE") {
+    await faceDetector.setOptions({ runningMode: "VIDEO" });
+    runningMode.value = "VIDEO";
   }
 
   const video = videoRef.value;
-  if (video.readyState < 2) { // Check if video is ready
-      console.log("Video not ready yet");
-      requestAnimationFrame(predictWebcam); // Try again on next frame
-      return;
+  if (video.readyState < 2) {
+    // Check if video is ready
+    console.log("Video not ready yet");
+    requestAnimationFrame(predictWebcam); // Try again on next frame
+    return;
   }
-
 
   let startTimeMs = performance.now();
   if (video.currentTime !== lastVideoTime) {
     lastVideoTime = video.currentTime;
 
     // Use await for async detection if available, otherwise handle promise
-     try {
-        const result: FaceDetectorResult = faceDetector.detectForVideo(video, startTimeMs);
-        displayVideoDetections(result.detections);
+    try {
+      const result: FaceDetectorResult = faceDetector.detectForVideo(
+        video,
+        startTimeMs
+      );
+      displayVideoDetections(result.detections);
     } catch (error) {
-        console.error("Error during video detection:", error);
-        // Handle potential errors during detection if necessary
+      console.error("Error during video detection:", error);
+      // Handle potential errors during detection if necessary
     }
   }
 
@@ -181,72 +144,131 @@ const displayVideoDetections = (detections: Detection[]) => {
 
   // Log number of faces detected in the current frame
   if (detections.length > 0) {
-      console.log(`Detected ${detections.length} faces in the video frame.`);
+    console.log(`Detected ${detections.length} faces in the video frame.`);
   }
 
   detections.forEach((detection, index) => {
-     if (!detection.boundingBox) return;
+    if (!detection.boundingBox) return;
 
-     // Log bounding box coordinates for each face
-     console.log(`Video Face ${index + 1} Bounding Box:`, {
-        originX: detection.boundingBox.originX,
-        originY: detection.boundingBox.originY,
-        width: detection.boundingBox.width,
-        height: detection.boundingBox.height,
-        // You can also log keypoints if needed:
-        // keypoints: detection.keypoints
-     });
-     const p = document.createElement('p');
-     const confidenceScore = detection.categories && detection.categories.length > 0
-       ? Math.round(detection.categories[0].score * 100)
-       : 'N/A';
-     // Adjust positioning based on video dimensions and mirroring if needed
-     const displayWidth = video.offsetWidth;
-     const displayHeight = video.offsetHeight; // Use offsetHeight for displayed size
-     const scaleX = displayWidth / video.videoWidth; // Calculate scale if needed, or assume 1 if display matches video resolution
-     const scaleY = displayHeight / video.videoHeight;
+    // Log bounding box coordinates for each face
+    console.log(`Video Face ${index + 1} Bounding Box:`, {
+      originX: detection.boundingBox.originX,
+      originY: detection.boundingBox.originY,
+      width: detection.boundingBox.width,
+      height: detection.boundingBox.height,
+      // You can also log keypoints if needed:
+      // keypoints: detection.keypoints
+    });
+    const p = document.createElement("p");
+    const confidenceScore =
+      detection.categories && detection.categories.length > 0
+        ? Math.round(detection.categories[0].score * 100)
+        : "N/A";
+    // Adjust positioning based on video dimensions and mirroring if needed
+    const displayWidth = video.offsetWidth;
+    const displayHeight = video.offsetHeight; // Use offsetHeight for displayed size
+    const scaleX = displayWidth / video.videoWidth; // Calculate scale if needed, or assume 1 if display matches video resolution
+    const scaleY = displayHeight / video.videoHeight;
 
-     const mirroredOriginX = video.videoWidth - detection.boundingBox.originX - detection.boundingBox.width;
-     p.style.position = 'absolute';
-     p.style.left = `${mirroredOriginX * scaleX}px`; // Use mirrored X
-     p.style.top = `${detection.boundingBox.originY * scaleY}px`; // Adjust Y position
-     p.style.width = `${detection.boundingBox.width}px`;
-     p.style.height = `${(detection.boundingBox.height) * scaleY}px`;
-     p.style.color = 'white'; // Make text visible on video
-     p.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'; // Add background for readability
-     p.style.padding = '2px';
-     p.style.fontSize = '12px';
-     liveView.appendChild(p);
-     children.value.push(p); // Track element for cleanup
+    const mirroredOriginX =
+      video.videoWidth -
+      detection.boundingBox.originX -
+      detection.boundingBox.width;
+    p.style.position = "absolute";
+    p.style.left = `${mirroredOriginX * scaleX}px`; // Use mirrored X
+    p.style.top = `${detection.boundingBox.originY * scaleY}px`; // Adjust Y position
+    p.style.width = `${detection.boundingBox.width}px`;
+    p.style.height = `${detection.boundingBox.height * scaleY}px`;
+    p.style.color = "white"; // Make text visible on video
+    p.style.backgroundColor = "rgba(0, 0, 0, 0.5)"; // Add background for readability
+    p.style.padding = "2px";
+    p.style.fontSize = "12px";
+    liveView.appendChild(p);
+    children.value.push(p); // Track element for cleanup
   });
+};
+
+// コンポーネント名をPascalCaseにするのが一般的です
+const VideoNoise = (props: { width: string; height: string }) => {
+  const noiseElements = [];
+  const noiseCount = parseInt(props.height); // 高さを数値に変換
+
+  for (let i = 0; i < noiseCount; i++) {
+    // h関数を使ってdiv要素のVNodeを生成
+    const noiseVNode = h("div", {
+      class: "noise", // CSSクラスを追加
+      style: {
+        position: "absolute", // 親要素内で絶対位置指定
+        width: "100%",
+        height: "1px",
+        top: `${i}px`, // 各ノイズ要素のY位置を設定
+        left: "0",
+        backgroundColor: colorMap[Math.floor(Math.random() * 5) + 1], // ランダムな色を設定
+        pointerEvents: "none", // クリックイベントを無効化
+        zIndex: "-1", // 他の要素の背後に表示
+      },
+    });
+    noiseElements.push(noiseVNode);
+  }
+
+  // 親divを生成し、子要素としてnoiseElements配列を渡す
+  return h(
+    "div",
+    {
+      style: {
+        position: "relative", // 子要素の絶対位置指定の基準とする
+        width: props.width,
+        height: props.height
+      },
+    },
+    noiseElements // 生成したノイズ要素の配列を子要素として渡す
+  );
 };
 
 // --- Utility Functions ---
 const clearDetections = (container: HTMLElement) => {
   // Remove dynamically added children
-  children.value.forEach(child => {
+  children.value.forEach((child) => {
     if (container.contains(child)) {
-        container.removeChild(child);
+      container.removeChild(child);
     }
   });
   children.value = []; // Clear the tracking array
 };
 
-// Helper to check if getUserMedia is supported
 const hasGetUserMedia = () => !!navigator.mediaDevices?.getUserMedia;
 </script>
 
 <template>
-  <section id="demos" class="invisible"> <!-- Start invisible until initialized -->
-    <div ref="liveViewRef" id="liveView" class="videoView" style="position: relative;">
-      <button ref="webcamButtonRef" id="webcamButton" class="mdc-button mdc-button--raised" @click="enableCam" :disabled="!hasGetUserMedia()">
+  <section id="demos" class="invisible">
+    <!-- Start invisible until initialized -->
+    <div
+      ref="liveViewRef"
+      id="liveView"
+      class="videoView"
+      style="position: relative"
+    >
+      <button
+        ref="webcamButtonRef"
+        id="webcamButton"
+        class="mdc-button mdc-button--raised"
+        @click="enableCam"
+        :disabled="!hasGetUserMedia()"
+      >
         <span class="mdc-button__ripple"></span>
         <span class="mdc-button__label">START</span>
       </button>
-    <video ref="videoRef" id="webcam" autoplay playsinline @loadeddata="predictWebcam" style="transform: scaleX(-1);"></video>
-      <!-- Detection results will be appended here -->
+      <video
+        ref="videoRef"
+        id="webcam"
+        autoplay
+        playsinline
+        @loadeddata="predictWebcam"
+        style="transform: scaleX(-1)"
+      ></video>
     </div>
   </section>
+  <VideoNoise width="600px" height="600px" />
 </template>
 
 <style scoped>
@@ -308,18 +330,20 @@ const hasGetUserMedia = () => !!navigator.mediaDevices?.getUserMedia;
   border-radius: 4px;
   text-transform: uppercase;
   font-weight: 500;
-  box-shadow: 0 2px 2px 0 rgba(0,0,0,0.14), 0 3px 1px -2px rgba(0,0,0,0.12), 0 1px 5px 0 rgba(0,0,0,0.2);
+  box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14),
+    0 3px 1px -2px rgba(0, 0, 0, 0.12), 0 1px 5px 0 rgba(0, 0, 0, 0.2);
   transition: box-shadow 0.2s ease;
 }
 
 .mdc-button:hover {
-  box-shadow: 0 3px 3px 0 rgba(0,0,0,0.14), 0 1px 7px 0 rgba(0,0,0,0.12), 0 3px 1px -1px rgba(0,0,0,0.2);
+  box-shadow: 0 3px 3px 0 rgba(0, 0, 0, 0.14), 0 1px 7px 0 rgba(0, 0, 0, 0.12),
+    0 3px 1px -1px rgba(0, 0, 0, 0.2);
 }
 
 .mdc-button:disabled {
-    background-color: rgba(0, 0, 0, 0.12);
-    color: rgba(0, 0, 0, 0.37);
-    cursor: default;
-    box-shadow: none;
+  background-color: rgba(0, 0, 0, 0.12);
+  color: rgba(0, 0, 0, 0.37);
+  cursor: default;
+  box-shadow: none;
 }
 </style>
