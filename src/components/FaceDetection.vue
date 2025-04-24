@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick, h } from "vue"; // h をインポート
+import { ref, onMounted, onBeforeUnmount, nextTick, h, type VNode } from "vue"; // h, VNode をインポート
 import {
   FaceDetector,
   FilesetResolver,
@@ -20,13 +20,13 @@ const liveViewRef = ref<HTMLDivElement | null>(null);
 const webcamButtonRef = ref<HTMLButtonElement | null>(null);
 const imageContainerRef = ref<HTMLDivElement | null>(null); // Ref for the image container
 const imageRef = ref<HTMLImageElement | null>(null); // Ref for the image element
+const children = ref<VNode[]>([]); // Store dynamically added VNodes
 
 // --- MediaPipe State ---
 let faceDetector: FaceDetector | undefined = undefined;
 let runningMode = ref<"IMAGE" | "VIDEO">("IMAGE");
 let webcamRunning = ref(false);
 let lastVideoTime = -1;
-const children = ref<HTMLElement[]>([]); // Store dynamically added elements
 
 // --- Initialization ---
 onMounted(async () => {
@@ -136,11 +136,10 @@ const predictWebcam = async () => {
 
 const displayVideoDetections = (detections: Detection[]) => {
   if (!liveViewRef.value || !videoRef.value) return;
-  const liveView = liveViewRef.value;
   const video = videoRef.value;
 
-  // Clear previous detections from live view
-  clearDetections(liveView);
+  // Clear previous detections by clearing the VNode array
+  children.value = []; // Clear VNodes
 
   // Log number of faces detected in the current frame
   if (detections.length > 0) {
@@ -156,35 +155,48 @@ const displayVideoDetections = (detections: Detection[]) => {
       originY: detection.boundingBox.originY,
       width: detection.boundingBox.width,
       height: detection.boundingBox.height,
-      // You can also log keypoints if needed:
-      // keypoints: detection.keypoints
     });
-    const p = document.createElement("p");
-    const confidenceScore =
-      detection.categories && detection.categories.length > 0
-        ? Math.round(detection.categories[0].score * 100)
-        : "N/A";
-    // Adjust positioning based on video dimensions and mirroring if needed
+
     const displayWidth = video.offsetWidth;
-    const displayHeight = video.offsetHeight; // Use offsetHeight for displayed size
-    const scaleX = displayWidth / video.videoWidth; // Calculate scale if needed, or assume 1 if display matches video resolution
+    const displayHeight = video.offsetHeight;
+    const scaleX = displayWidth / video.videoWidth;
     const scaleY = displayHeight / video.videoHeight;
 
     const mirroredOriginX =
       video.videoWidth -
       detection.boundingBox.originX -
       detection.boundingBox.width;
-    p.style.position = "absolute";
-    p.style.left = `${mirroredOriginX * scaleX}px`; // Use mirrored X
-    p.style.top = `${detection.boundingBox.originY * scaleY}px`; // Adjust Y position
-    p.style.width = `${detection.boundingBox.width}px`;
-    p.style.height = `${detection.boundingBox.height * scaleY}px`;
-    p.style.color = "white"; // Make text visible on video
-    p.style.backgroundColor = "rgba(0, 0, 0, 0.5)"; // Add background for readability
-    p.style.padding = "2px";
-    p.style.fontSize = "12px";
-    liveView.appendChild(p);
-    children.value.push(p); // Track element for cleanup
+
+    const boxWidth = detection.boundingBox.width * scaleX;
+    const boxHeight = detection.boundingBox.height * scaleY;
+    const boxLeft = mirroredOriginX * scaleX;
+    const boxTop = detection.boundingBox.originY * scaleY;
+
+    // Create a VNode for the VideoNoise component wrapped in a positioned div
+    const noiseWrapperVNode = h(
+      'div', // Wrapper div for positioning
+      {
+        style: {
+          position: 'absolute',
+          left: `${boxLeft}px`,
+          top: `${boxTop}px`,
+          width: `${boxWidth}px`, // Pass width to wrapper
+          height: `${boxHeight}px`, // Pass height to wrapper
+          // border: '2px solid rgba(255, 0, 0, 0.5)', // Optional: Add border for debugging
+          // overflow: 'hidden', // Removed: Allow noise to overflow
+          pointerEvents: 'none', // Prevent interaction with the wrapper
+          zIndex: '1' // Add z-index to bring it to the front
+        }
+      },
+      [ // Children of the wrapper div
+        h(VideoNoise, { // The VideoNoise component itself
+          width: `${boxWidth}px`, // Pass width prop
+          height: `${boxHeight}px` // Pass height prop
+        })
+      ]
+    );
+
+    children.value.push(noiseWrapperVNode); // Add the wrapper VNode to the array
   });
 };
 
@@ -193,21 +205,28 @@ const VideoNoise = (props: { width: string; height: string }) => {
   const noiseElements = [];
   const noiseCount = parseInt(props.height); // 高さを数値に変換
 
+  const randomNumbers = [];
   for (let i = 0; i < noiseCount; i++) {
-    // h関数を使ってdiv要素のVNodeを生成
-    const noiseVNode = h("div", {
-      class: "noise", // CSSクラスを追加
-      style: {
-        position: "absolute", // 親要素内で絶対位置指定
-        width: "100%",
-        height: "1px",
-        top: `${i}px`, // 各ノイズ要素のY位置を設定
-        left: "0",
-        backgroundColor: colorMap[Math.floor(Math.random() * 5) + 1], // ランダムな色を設定
-        pointerEvents: "none", // クリックイベントを無効化
-        zIndex: "-1", // 他の要素の背後に表示
-      },
-    });
+    // randomNumbers.push(parseInt(props.width, 10) + Math.floor(Math.random() * parseInt(props.width, 10)) + 1);
+    randomNumbers.push(Math.floor(Math.random() * parseInt(props.width, 10)*2) + 1);
+  }
+  for (let i = 0; i < noiseCount; i++) {
+      // h関数を使ってdiv要素のVNodeを生成
+      const noiseVNode = h("div", {
+        class: "noise", // CSSクラスを追加
+        style: {
+          position: "absolute", // 親要素内で絶対位置指定
+          width: `${randomNumbers[i]}px`, // ランダムな幅を設定
+          textAlign: "center",
+          height: "10px",
+          top: `${i}px`, // 各ノイズ要素のY位置を設定
+          left: "50%", // 中央に配置
+          transform: "translateX(-50%)", // 要素の幅の半分移動して中央に揃える
+          backgroundColor: colorMap[Math.floor(Math.random() * 5) + 1], // ランダムな色を設定
+          pointerEvents: "none", // クリックイベントを無効化
+          zIndex: "-1", // 他の要素の背後に表示
+        },
+      });
     noiseElements.push(noiseVNode);
   }
 
@@ -227,13 +246,9 @@ const VideoNoise = (props: { width: string; height: string }) => {
 
 // --- Utility Functions ---
 const clearDetections = (container: HTMLElement) => {
-  // Remove dynamically added children
-  children.value.forEach((child) => {
-    if (container.contains(child)) {
-      container.removeChild(child);
-    }
-  });
-  children.value = []; // Clear the tracking array
+  // Clearing the children ref array will trigger Vue's reactivity
+  // and remove the components from the DOM.
+  children.value = [];
 };
 
 const hasGetUserMedia = () => !!navigator.mediaDevices?.getUserMedia;
@@ -266,9 +281,10 @@ const hasGetUserMedia = () => !!navigator.mediaDevices?.getUserMedia;
         @loadeddata="predictWebcam"
         style="transform: scaleX(-1)"
       ></video>
+      <!-- Render the VNodes stored in the children ref -->
+      <component v-for="(child, index) in children" :key="index" :is="child" />
     </div>
   </section>
-  <VideoNoise width="600px" height="600px" />
 </template>
 
 <style scoped>
