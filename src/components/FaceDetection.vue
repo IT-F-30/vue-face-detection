@@ -6,6 +6,7 @@ import {
   type Detection, // Changed: Added 'type' keyword
   type FaceDetectorResult // Changed: Added 'type' keyword
 } from '@mediapipe/tasks-vision';
+const colorMap: Record<number, string> = { 1: "#000000", 2: "#FFFFFF", 3: "#FF0000", 4: "#00FF00", 5: "#0000FF",6:"rgba(0,0,0,0)" };
 
 // --- Refs for DOM elements ---
 const videoRef = ref<HTMLVideoElement | null>(null);
@@ -104,25 +105,7 @@ const displayImageDetections = (detections: Detection[], resultElement: HTMLImag
         originY: detection.boundingBox.originY,
         width: detection.boundingBox.width,
         height: detection.boundingBox.height,
-        // You can also log keypoints if needed:
-        // keypoints: detection.keypoints
     });
-
-    // --- Existing code for drawing ---
-
-    // Confidence text
-    const p = document.createElement('p');
-    const confidenceScore = detection.categories && detection.categories.length > 0
-      ? Math.round(detection.categories[0].score * 100)
-      : 'N/A';
-    p.innerText = `Confidence: ${confidenceScore}%`;
-    p.style.left = `${detection.boundingBox.originX * ratio}px`;
-    p.style.top = `${detection.boundingBox.originY * ratio - 30}px`; // Adjust position
-    p.style.width = `${detection.boundingBox.width * ratio - 10}px`; // Adjust width
-    container.appendChild(p);
-    children.value.push(p); // Track element for cleanup
-    // );
-    // --- End of existing drawing code ---
   });
 };
 
@@ -213,18 +196,28 @@ const displayVideoDetections = (detections: Detection[]) => {
         // You can also log keypoints if needed:
         // keypoints: detection.keypoints
      });
-
-     // --- Existing code for drawing ---
      const p = document.createElement('p');
      const confidenceScore = detection.categories && detection.categories.length > 0
        ? Math.round(detection.categories[0].score * 100)
        : 'N/A';
-     p.innerText = `Confidence: ${confidenceScore}%`;
      // Adjust positioning based on video dimensions and mirroring if needed
      const displayWidth = video.offsetWidth;
      const displayHeight = video.offsetHeight; // Use offsetHeight for displayed size
      const scaleX = displayWidth / video.videoWidth; // Calculate scale if needed, or assume 1 if display matches video resolution
      const scaleY = displayHeight / video.videoHeight;
+
+     const mirroredOriginX = video.videoWidth - detection.boundingBox.originX - detection.boundingBox.width;
+     p.style.position = 'absolute';
+     p.style.left = `${mirroredOriginX * scaleX}px`; // Use mirrored X
+     p.style.top = `${detection.boundingBox.originY * scaleY}px`; // Adjust Y position
+     p.style.width = `${detection.boundingBox.width}px`;
+     p.style.height = `${(detection.boundingBox.height) * scaleY}px`;
+     p.style.color = 'white'; // Make text visible on video
+     p.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'; // Add background for readability
+     p.style.padding = '2px';
+     p.style.fontSize = '12px';
+     liveView.appendChild(p);
+     children.value.push(p); // Track element for cleanup
   });
 };
 
@@ -241,43 +234,22 @@ const clearDetections = (container: HTMLElement) => {
 
 // Helper to check if getUserMedia is supported
 const hasGetUserMedia = () => !!navigator.mediaDevices?.getUserMedia;
-
 </script>
 
 <template>
   <section id="demos" class="invisible"> <!-- Start invisible until initialized -->
-
     <div ref="liveViewRef" id="liveView" class="videoView" style="position: relative;">
       <button ref="webcamButtonRef" id="webcamButton" class="mdc-button mdc-button--raised" @click="enableCam" :disabled="!hasGetUserMedia()">
         <span class="mdc-button__ripple"></span>
         <span class="mdc-button__label">START</span>
       </button>
-      <video ref="videoRef" id="webcam" autoplay playsinline @loadeddata="predictWebcam" style="transform: scaleX(-1);"></video> <!-- Mirrored video -->
+    <video ref="videoRef" id="webcam" autoplay playsinline @loadeddata="predictWebcam" style="transform: scaleX(-1);"></video>
       <!-- Detection results will be appended here -->
     </div>
   </section>
 </template>
 
 <style scoped>
-/* Add the CSS from the original example here */
-body {
-  font-family: roboto;
-  margin: 2em;
-  color: #3d3d3d;
-  background-color: #f5f5f5;
-}
-
-h1,
-h2 {
-  margin-top: 1em;
-  margin-bottom: 0.5em;
-  color: #007f8b;
-}
-
-p {
-  font-size: 0.8rem;
-}
-
 .invisible {
   opacity: 0.2;
 }
